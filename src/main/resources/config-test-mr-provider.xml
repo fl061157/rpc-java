@@ -1,0 +1,67 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+
+    <context:component-scan base-package="cn.v5.mr,cn.v5.rpc"/>
+
+
+    <bean id="propertyConfigurer"
+          class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    </bean>
+
+
+    <bean id="taskExecutor"
+          class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+        <property name="corePoolSize" value="300"/>
+        <property name="maxPoolSize" value="900"/>
+        <property name="queueCapacity" value="1000"/>
+    </bean>
+
+    <bean id="executorService" class="cn.v5.rpc.support.ExecutorServiceAdapter">
+        <constructor-arg ref="taskExecutor"/>
+    </bean>
+
+    <bean id="mrConnectionManager" class="cn.v5.rpc.cluster.MRClusterConnectionManagerSpring">
+        <property name="group" value="cn_1"/>
+        <property name="discoverURL" value="192.168.1.159:2181"/>
+        <property name="executor" ref="taskExecutor"/>
+        <property name="clusterType" value="rpcServer"/>
+        <property name="provider" value="${rpc.provider}"/>
+    </bean>
+
+
+    <bean id="helloService" class="cn.v5.rpc.demo.HelloServiceImpl">
+    </bean>
+
+
+    <bean id="rpcServiceManager" class="cn.v5.rpc.RpcServiceManager">
+    </bean>
+
+    <bean id="messagePack" class="org.msgpack.MessagePack">
+    </bean>
+
+
+    <bean class="cn.v5.rpc.RpcServiceBeanAutoConfiguration">
+        <property name="mrConnectionManager" ref="mrConnectionManager"/>
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+        <property name="messagePack" ref="messagePack"/>
+        <property name="perfetchSize" value="1024"/>
+    </bean>
+
+
+    <bean name="msgExportMRHelloService" class="cn.v5.rpc.MRMessagePackInvokerServiceExporter">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="service" ref="helloService"/>
+        <property name="serviceInterface" value="cn.v5.rpc.demo.HelloService"/>
+        <property name="messagePack" ref="messagePack"/>
+        <property name="connectionManager" ref="mrConnectionManager"/>
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+        <property name="perfetchSize" value="2048"/>
+    </bean>
+
+
+</beans>

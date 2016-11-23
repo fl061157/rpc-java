@@ -1,0 +1,187 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+
+    <context:component-scan base-package="cn.v5.mr,cn.v5.rpc"/>
+
+    <bean id="taskExecutor"
+          class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+        <property name="corePoolSize" value="300"/>
+        <property name="maxPoolSize" value="900"/>
+        <property name="queueCapacity" value="1000"/>
+    </bean>
+
+    <bean id="executorService" class="cn.v5.rpc.support.ExecutorServiceAdapter">
+        <constructor-arg ref="taskExecutor"/>
+    </bean>
+
+    <bean id="mrConnectionManager" class="cn.v5.rpc.cluster.MRClusterConnectionManagerSpring">
+        <property name="group" value="cn_1"/>
+        <property name="discoverURL" value="127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183"/>
+        <property name="executor" ref="taskExecutor"/>
+        <property name="isProvider" value="true"/>
+    </bean>
+
+    <bean id="mrConnectionManager2" class="cn.v5.rpc.cluster.MRClusterConnectionManagerSpring">
+        <property name="group" value="cn_1"/>
+        <property name="discoverURL" value="127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183"/>
+        <property name="executor" ref="taskExecutor"/>
+        <property name="isProvider" value="false"/>
+    </bean>
+
+    <bean id="mrPublisher" class="cn.v5.mr.MRPublisherFactoryBean">
+        <property name="connectionManager" ref="mrConnectionManager2"/>
+    </bean>
+
+    <bean id="helloService" class="cn.v5.mr.test.HelloServiceImpl">
+    </bean>
+
+    <bean name="exportMRHelloService" class="cn.v5.rpc.MRInvokerServiceExporter">
+        <property name="serviceUrl" value="rpc/hello"/>
+        <property name="service" ref="helloService"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+    </bean>
+
+    <bean class="cn.v5.mr.MRMessageListenerAdd">
+        <property name="connectionManager" ref="mrConnectionManager"/>
+        <property name="listener" ref="exportMRHelloService"/>
+        <property name="topic" value="rpc/hello"/>
+    </bean>
+
+
+    <!-- Consumer   -->
+
+    <bean id="mrInvokerProxyHelloService" class="cn.v5.rpc.MRInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="publisher" ref="mrPublisher"/>
+    </bean>
+
+    <bean id="localPublisher" class="cn.v5.mr.test.LocalPublisherImpl">
+        <property name="exporter" ref="exportMRHelloService"/>
+    </bean>
+
+    <bean id="localInvokerProxyHelloService" class="cn.v5.rpc.MRInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="publisher" ref="localPublisher"/>
+    </bean>
+
+    <!-- msg -->
+
+    <bean id="rpcServiceManager" class="cn.v5.rpc.RpcServiceManager">
+
+    </bean>
+
+    <bean id="messagePack" class="org.msgpack.MessagePack">
+
+    </bean>
+
+    <bean id="rpcClient" class="cn.v5.rpc.RpcClient">
+        <constructor-arg ref="messagePack"/>
+        <constructor-arg ref="mrPublisher"/>
+        <constructor-arg ref="taskExecutor"/>
+        <constructor-arg value="10"/>
+    </bean>
+
+    <bean class="cn.v5.rpc.RpcServiceBeanAutoConfiguration">
+        <property name="mrConnectionManager" ref="mrConnectionManager"/>
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+        <property name="messagePack" ref="messagePack"/>
+        <property name="perfetchSize" value="1024"/>
+    </bean>
+
+    <bean name="msgExportMRHelloService" class="cn.v5.rpc.MRMessagePackInvokerServiceExporter">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="service" ref="helloService"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="messagePack" ref="messagePack"/>
+        <property name="connectionManager" ref="mrConnectionManager"/>
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+        <property name="perfetchSize" value="2048"/>
+    </bean>
+
+    <bean id="msgLocalPublisher" class="cn.v5.mr.test.MsgLocalPublisherImpl">
+        <property name="executor" ref="taskExecutor"/>
+        <property name="mrMessagePackInvokerServiceExporter" ref="msgExportMRHelloService"/>
+    </bean>
+
+    <bean id="msgLocalPackHelloService" class="cn.v5.rpc.MRMessagePackInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="publisher" ref="msgLocalPublisher"/>
+        <property name="executor" ref="taskExecutor"/>
+    </bean>
+
+    <bean id="msgPackHelloService" class="cn.v5.rpc.MRMessagePackInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="rpcClient" ref="rpcClient"/>
+    </bean>
+
+    <bean id="msgPackHelloServiceAsync" class="cn.v5.rpc.MRMessagePackInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloServiceAsync"/>
+        <property name="rpcClient" ref="rpcClient"/>
+    </bean>
+
+    <!-- http -->
+    <bean id="msgPackHttpExporter" class="cn.v5.rpc.http.MRHttpInvokerServiceExporter">
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+    </bean>
+
+    <bean id="mrHttpApiHandler" class="cn.v5.rpc.http.MRHttpPublisherProxy">
+        <property name="mrPublisher" ref="mrPublisher"/>
+    </bean>
+
+    <bean id="rpcHttpServiceViewHandler" class="cn.v5.rpc.http.MRRpcServiceViewHandler">
+        <property name="rpcServiceManager" ref="rpcServiceManager"/>
+    </bean>
+
+    <bean id="simpleHttpServer" class="cn.v5.rpc.support.GrizzlyHttpServer">
+        <property name="port" value="8088"/>
+        <property name="httpRequestHandlerServlets">
+            <set>
+                <bean class="cn.v5.rpc.support.HttpRequestHandlerServlet">
+                    <property name="name" value="rpc servlet"/>
+                    <property name="httpRequestHandler" ref="msgPackHttpExporter"/>
+                    <property name="mapping" value="/mrpc/*"/>
+                </bean>
+                <bean class="cn.v5.rpc.support.HttpRequestHandlerServlet">
+                    <property name="name" value="mrhttpproxy"/>
+                    <property name="httpRequestHandler" ref="mrHttpApiHandler"/>
+                    <property name="mapping" value="/mr/api"/>
+                </bean>
+                <bean class="cn.v5.rpc.support.HttpRequestHandlerServlet">
+                    <property name="name" value="rpc service view"/>
+                    <property name="httpRequestHandler" ref="rpcHttpServiceViewHandler"/>
+                    <property name="mapping" value="/mr/interface"/>
+                </bean>
+            </set>
+        </property>
+    </bean>
+
+    <bean id="msgPackHttpPublisher" class="cn.v5.rpc.http.MRHttpRpcPublisher">
+        <property name="url" value="http://localhost:8088/mrpc"/>
+        <property name="executorService" ref="executorService"/>
+    </bean>
+
+    <bean id="msgPackHttpHelloService" class="cn.v5.rpc.MRMessagePackInvokerProxyFactoryBean">
+        <property name="serviceUrl" value="msg/rpc/hello"/>
+        <property name="serviceInterface" value="cn.v5.mr.test.HelloService"/>
+        <property name="publisher" ref="msgPackHttpPublisher"/>
+        <property name="executor" ref="taskExecutor"/>
+    </bean>
+
+    <bean id="rpcHttpClient" class="cn.v5.rpc.RpcClient">
+        <constructor-arg ref="messagePack"/>
+        <constructor-arg ref="msgPackHttpPublisher"/>
+        <constructor-arg ref="taskExecutor"/>
+        <constructor-arg value="10"/>
+    </bean>
+
+</beans>

@@ -1,0 +1,17 @@
+/target/
+.classpath
+.project
+/settings/
+*.iml
+.idea
+.idea/*
+.settings
+
+/logs/
+*.log
+.tags
+.tags_sorted_by_file
+cscope.files
+cscope.in.out
+cscope.out
+cscope.po.out
